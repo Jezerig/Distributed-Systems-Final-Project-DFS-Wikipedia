@@ -11,83 +11,9 @@
 
 
 from ast import Continue
-import wikipedia
-import threading
 from queue import Queue
-from collections import defaultdict
-
-# class Node:
-#     def __init__(self, value, neighbors=None):
-#         self._value = value
-#         if neighbors is None:
-#             self._neighbors = []
-#         else:
-#             self._neighbors = neighbors
-
-#     def has_neighbors(self):
-#         if len(self._neighbors) == 0:
-#             return False
-#         return True
-    
-#     def add_neighbor(self, neighbor):
-#         self._neighbors.append(neighbor)
-
-
-class Graph:
-    def __init__(self):
-        self.graph = defaultdict(list)
-
-    def add_edge(self, node1, node2):
-        self.graph[node1].append(node2)
-
-    def bfs(self, start_page, goal_page):
-        visited = set()
-        queue = Queue()
-
-        start_node = start_page.title
-        goal_node = goal_page.title
-
-        queue.put(start_node)
-        visited.add(start_node)
-
-        parent = dict()
-        parent[start_node] = None
-
-        path_found = False
-        
-        while not queue.empty():
-            current_node = queue.get()
-            if current_node == goal_node:
-                path_found = True
-                break
-            try:
-                links = wikipedia.page(current_node, auto_suggest=False).links
-            except(wikipedia.PageError, wikipedia.DisambiguationError):
-                print(f"Skipped {current_node}.")
-                Continue
-            print(current_node)
-            for link in links:
-                self.add_edge(current_node, link)
-                if link not in visited:
-                    queue.put(link)
-                    parent[link] = current_node
-                    visited.add(link)
-            # for next_node in self.graph[current_node]:
-                
-
-        path = []
-        if path_found:
-            path.append(goal_node)
-            previous_node = goal_node
-            while(parent[previous_node] is not None):
-                path.append(parent[previous_node])
-                previous_node = parent[previous_node]
-            path.reverse()
-        print(path)
-        return path
-        
-    
-
+import threading
+import wikipedia
 
 def search_page_name(page_type): # selecting the search term
     while(True):
@@ -127,7 +53,53 @@ def page_select(page_type): # selecting the spesific page from the list of searc
     return wikipedia.page(pages[int(selection) - 1], auto_suggest=False)
 
 
+def bfs(start_page, goal_page):
+    visited = set()
+    queue = Queue()
 
+    start_node = start_page.title
+    goal_node = goal_page.title
+
+    queue.put(start_node)
+    visited.add(start_node)
+
+    parent = dict()
+    parent[start_node] = None
+
+    path_found = False
+    
+    while not queue.empty():
+        current_node = queue.get()
+        if current_node == goal_node:
+            path_found = True
+            break
+        try:
+            links = wikipedia.page(current_node, auto_suggest=False).links
+        except(wikipedia.PageError, wikipedia.DisambiguationError):
+            print(f"Skipped {current_node}.")
+            Continue
+
+        for link in links:
+            if link not in visited:
+                queue.put(link)
+                parent[link] = current_node
+                visited.add(link)  
+
+    path = []
+    if path_found:
+        path.append(goal_node)
+        previous_node = goal_node
+        while(parent[previous_node] is not None):
+            path.append(parent[previous_node])
+            previous_node = parent[previous_node]
+        path.reverse()
+    
+    for node in path:
+        if(node != path[-1]):
+            print(f"{node} -> ", end="")
+        else:
+            print(node)
+    return path
 
 
 def main():
@@ -140,8 +112,8 @@ def main():
     if(start_page == goal_page):
         print("The Start page and the Goal page are the same. Path length 0.")
         return 0
-    graph = Graph()
-    graph.bfs(start_page, goal_page)
+
+    bfs(start_page, goal_page)
 
 
     return 0
