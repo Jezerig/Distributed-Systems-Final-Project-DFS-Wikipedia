@@ -8,12 +8,14 @@
 # https://stackabuse.com/graphs-in-python-breadth-first-search-bfs-algorithm/
 # https://stackoverflow.com/questions/44219288/should-i-bother-locking-the-queue-when-i-put-to-or-get-from-it
 # https://www.geeksforgeeks.org/breadth-first-search-or-bfs-for-a-graph/
-
+# https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution
 
 from ast import Continue
 from queue import Queue
 import threading
+import time
 import wikipedia
+
 
 def search_page_name(page_type): # selecting the search term
     while(True):
@@ -76,7 +78,6 @@ def bfs(start_page, goal_page):
         try:
             links = wikipedia.page(current_node, auto_suggest=False).links
         except(wikipedia.PageError, wikipedia.DisambiguationError):
-            print(f"Skipped {current_node}.")
             Continue
 
         for link in links:
@@ -112,10 +113,9 @@ def main():
     if(start_page == goal_page):
         print("The Start page and the Goal page are the same. Path length 0.")
         return 0
-
+    start_time = time.time()
     bfs(start_page, goal_page)
-
-
+    print(f"Execution time: {round((time.time() - start_time), 3)} seconds.")
     return 0
 
 if __name__ == '__main__':
