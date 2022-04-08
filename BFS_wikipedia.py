@@ -86,6 +86,7 @@ def bfs(start_page, goal_page):
     
     while not queue.empty():
         current_node = queue.get()
+        # print(current_node)
         if current_node == goal_node:
             path_found = True
             break
@@ -100,7 +101,10 @@ def bfs(start_page, goal_page):
                 queue.put(link)
                 parent[link] = current_node
                 visited.add(link)  
-
+                if(link == goal_node):
+                    path_found = True
+        if(path_found):
+            break
     path = []
     if path_found:
         path.append(goal_node)
