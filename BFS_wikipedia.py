@@ -16,10 +16,9 @@ import threading
 import time
 import wikipedia
 
-
 def search_page_name(page_type): # selecting the search term
     while(True):
-        page_name = input(f"{page_type} page: ")
+        page_name = input(f"\n{page_type} page: ")
         if(len(page_name.strip()) > 0):
             break
         else:
@@ -29,9 +28,9 @@ def search_page_name(page_type): # selecting the search term
 def page_select(page_type): # selecting the spesific page from the list of search results
     while(True):
         page_name = search_page_name(page_type)
-        pages = wikipedia.search(page_name, results=10)
+        pages = wikipedia.search(page_name, results=5)
         if(len(pages) == 0):
-            print(f"No pages found with the search term {page_name}.")
+            print(f"No pages found with the search term '{page_name}'.")
             continue
         else:
             break
@@ -43,16 +42,31 @@ def page_select(page_type): # selecting the spesific page from the list of searc
         i+=1
 
     while(True):
-        selection = input("Selection: ")
+        selection = input("\nSelection: ")
         if(not(selection.isdigit())):
             print(f"\nThe selection has to be a number between 1 and {len(pages)}.")
             continue
         if(len(selection.strip()) > 0 and 0 < int(selection) and int(selection) < len(pages)):
-            print("")
+            selected_page = pages[int(selection) - 1]
             break
         else:
             print(f"\nThe selection has to be a number between 1 and {len(pages)}.")
-    return wikipedia.page(pages[int(selection) - 1], auto_suggest=False)
+            continue
+    while(True):
+        try:
+            return wikipedia.page(selected_page, auto_suggest=False)
+        except(wikipedia.PageError):
+            print(f"Error with the page '{selected_page}'. Exiting...")
+            exit(-1)
+        except wikipedia.DisambiguationError as e:
+            print(f"\nThe page '{selected_page}' created a Disambiguation Error due to it not being a spesific page.\nTry with one of the pages listed below.\n")
+            print(e)
+            selected_page = input(f"\n{page_type} page name: ")
+            continue
+        except wikipedia.WikipediaException:
+            print("Error with the Wikipedia API. Exiting...")
+            exit(-1)
+            
 
 
 def bfs(start_page, goal_page):
@@ -75,11 +89,12 @@ def bfs(start_page, goal_page):
         if current_node == goal_node:
             path_found = True
             break
+        # start_time = time.time()
         try:
             links = wikipedia.page(current_node, auto_suggest=False).links
         except(wikipedia.PageError, wikipedia.DisambiguationError):
             Continue
-
+        # print(f"Wikipedia API response time: {round((time.time() - start_time), 3)} seconds.")
         for link in links:
             if link not in visited:
                 queue.put(link)
@@ -104,8 +119,8 @@ def bfs(start_page, goal_page):
 
 
 def main():
-    print("Welcome!\nThis program finds the shortest path between two Wikipedia pages\nby searching through the links found on each Wikipedia page.")
-    print("Start by searching for the Start page and the Goal page.\n")
+    print("\nWelcome!\n\nThis program finds the shortest path between two Wikipedia pages\nby searching through the links found on each Wikipedia page.")
+    print("Start by searching for the Start page and the Goal page.")
 
     start_page = page_select("Start")
     goal_page = page_select("Goal")
@@ -115,7 +130,7 @@ def main():
         return 0
     start_time = time.time()
     bfs(start_page, goal_page)
-    print(f"Execution time: {round((time.time() - start_time), 3)} seconds.")
+    print(f"Search time: {round((time.time() - start_time), 3)} seconds.")
     return 0
 
 if __name__ == '__main__':
