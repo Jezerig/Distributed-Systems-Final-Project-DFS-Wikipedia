@@ -18,7 +18,7 @@ import time
 import wikipedia
 from queue import Queue # has locking built in
 
-THREAD_COUNT = 10
+THREAD_COUNT = 7
 STOP_THREADS = False # global variable to tell the threads to stop: https://www.geeksforgeeks.org/python-different-ways-to-kill-a-thread/
 EXIT_FLAG = False # global variable to tell the main function to exit
 
