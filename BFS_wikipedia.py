@@ -9,12 +9,100 @@
 # https://stackoverflow.com/questions/44219288/should-i-bother-locking-the-queue-when-i-put-to-or-get-from-it
 # https://www.geeksforgeeks.org/breadth-first-search-or-bfs-for-a-graph/
 # https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution
+# http://pymotw.com/2/threading/
+# https://www.geeksforgeeks.org/python-different-ways-to-kill-a-thread/
+# https://stackoverflow.com/questions/11436502/closing-all-threads-with-a-keyboard-interrupt
 
-from ast import Continue
-from queue import Queue
 import threading
 import time
 import wikipedia
+
+THREAD_COUNT = 10
+STOP_THREADS = False
+EXIT_FLAG = False
+
+class PageQueue():
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.queue = []
+
+    def add_to_queue(self, page):
+        self.lock.acquire()
+        try:
+            self.queue.append(page)
+        finally:
+            self.lock.release()
+
+    def pop_from_queue(self):
+        self.lock.acquire()
+        try:
+            if(len(self.queue) > 0):
+                return self.queue.pop(0)
+            else:
+                return ""
+        finally:
+            self.lock.release()
+        
+    # def not_empty(self):
+    #     self.lock.acquire()
+    #     try:
+    #         if (len(self.queue) > 0):
+    #             return True
+    #         else:
+    #             return False
+    #     finally:
+    #         self.lock.release()
+
+class VisitedPages():
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.visited = []
+
+    def add_to_visited(self, page):
+        self.lock.acquire()
+        try:
+          self.visited.append(page)
+        finally:
+            self.lock.release()
+
+    def notVisited(self, page):
+        self.lock.acquire()
+        try:
+            if page not in self.visited:
+                self.visited.append(page)
+                return True
+            else:
+                return False
+        finally:
+            self.lock.release()
+
+class Parent():
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.parent = dict()
+
+    def add_parent(self, current_page, link):
+        self.lock.acquire()
+        try:
+            self.parent[link] = current_page
+        finally:
+            self.lock.release()
+    
+    def get_parent(self, page):
+        return self.parent[page]
+
+# class Path():
+#     def __init__(self):
+#         self.lock = threading.Lock()
+#         self.path = []
+
+#     def add_to_path(self, page):
+#         self.lock.acquire()
+#         try:
+#             self.path.append(page)
+#         finally:
+#             self.lock.release()
+
 
 def search_page_name(page_type): # selecting the search term
     while(True):
@@ -35,7 +123,7 @@ def page_select(page_type): # selecting the spesific page from the list of searc
         else:
             break
 
-    print(f"\nPlease select the {page_type} page from the list: ")
+    print(f"\nPlease select the {page_type} page from the list of suggested pages: ")
     i = 1
     for page in pages:
         print(f"{i}. {page}")
@@ -54,7 +142,10 @@ def page_select(page_type): # selecting the spesific page from the list of searc
             continue
     while(True):
         try:
-            return wikipedia.page(selected_page, auto_suggest=False)
+            return_page = wikipedia.page(selected_page, auto_suggest=False)
+            print(f"\nSuccess. {page_type} page set as '{return_page.title}'.")
+            return return_page
+
         except(wikipedia.PageError):
             print(f"Error with the page '{selected_page}'. Exiting...")
             exit(-1)
@@ -69,24 +160,15 @@ def page_select(page_type): # selecting the spesific page from the list of searc
             
 
 
-def bfs(start_page, goal_page):
-    visited = set()
-    queue = Queue()
-
-    start_node = start_page.title
-    goal_node = goal_page.title
-
-    queue.put(start_node)
-    visited.add(start_node)
-
-    parent = dict()
-    parent[start_node] = None
-
+def search(goal_page, visited, queue, parent, path_lock):
+    global STOP_THREADS
     path_found = False
-    
-    while not queue.empty():
-        current_node = queue.get()
-        # print(current_node)
+    goal_node = goal_page.title
+    while not STOP_THREADS:
+        current_node = queue.pop_from_queue()
+        if(len(current_node) <= 0):
+            time.sleep(0.1)
+            continue
         if current_node == goal_node:
             path_found = True
             break
@@ -94,32 +176,46 @@ def bfs(start_page, goal_page):
         try:
             links = wikipedia.page(current_node, auto_suggest=False).links
         except(wikipedia.PageError, wikipedia.DisambiguationError):
-            Continue
-        # print(f"Wikipedia API response time: {round((time.time() - start_time), 3)} seconds.")
+            continue
+        # print(f"'{current_node}' Wikipedia API response time: {round((time.time() - start_time), 3)} seconds ({threading.current_thread().name}).")
         for link in links:
-            if link not in visited:
-                queue.put(link)
-                parent[link] = current_node
-                visited.add(link)  
+            if visited.notVisited(link):
+                queue.add_to_queue(link)
+                parent.add_parent(current_node, link) 
                 if(link == goal_node):
                     path_found = True
         if(path_found):
             break
-    path = []
+        if(STOP_THREADS):
+            break
+
     if path_found:
-        path.append(goal_node)
-        previous_node = goal_node
-        while(parent[previous_node] is not None):
-            path.append(parent[previous_node])
-            previous_node = parent[previous_node]
-        path.reverse()
-    
+        path_lock.acquire()
+        try:
+            if(STOP_THREADS):
+                return
+            STOP_THREADS = True
+            shortest_path(goal_node, parent)
+        finally:
+            path_lock.release()
+        
+
+def shortest_path(goal_node, parent):
+    global EXIT_FLAG
+    path = []
+    path.append(goal_node)
+    previous_node = goal_node
+    while(parent.get_parent(previous_node) is not None):
+        path.append(parent.get_parent(previous_node))
+        previous_node = parent.get_parent(previous_node)
+    path.reverse()
+    print(f"The shortest path with the length of {len(path) - 1} is: ")
     for node in path:
         if(node != path[-1]):
             print(f"{node} -> ", end="")
         else:
             print(node)
-    return path
+    EXIT_FLAG = True
 
 
 def main():
@@ -132,9 +228,37 @@ def main():
     if(start_page == goal_page):
         print("The Start page and the Goal page are the same. Path length 0.")
         return 0
+    
+    visited = VisitedPages()
+    queue = PageQueue()
+    parent = Parent()
+    path_lock = threading.Lock()
+
+    queue.add_to_queue(start_page.title)
+    visited.add_to_visited(start_page.title)
+    parent.add_parent(None, start_page.title)
+
     start_time = time.time()
-    bfs(start_page, goal_page)
-    print(f"Search time: {round((time.time() - start_time), 3)} seconds.")
+
+    threads_list = []
+    for i in range(THREAD_COUNT):
+        try:
+            thread = threading.Thread(target=search, args=(goal_page, visited, queue, parent, path_lock), name=f"Thread-{i}")
+            thread.daemon = True
+            thread.start()
+            threads_list.append(thread)
+        except:
+            print("Fatal Error with threads")
+            exit(-1)
+
+    while not EXIT_FLAG:
+        try:
+            time.sleep(0.1)           
+        except KeyboardInterrupt:
+            print("KeyboardInterrupt")
+            exit(-1)
+
+    print(f"Execution time: {round((time.time() - start_time), 3)} seconds.")
     return 0
 
 if __name__ == '__main__':
