@@ -16,33 +16,11 @@
 import threading
 import time
 import wikipedia
+from queue import Queue
 
 THREAD_COUNT = 10
 STOP_THREADS = False
 EXIT_FLAG = False
-
-class PageQueue():
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.queue = []
-
-    def add_to_queue(self, page):
-        self.lock.acquire()
-        try:
-            self.queue.append(page)
-        finally:
-            self.lock.release()
-
-    def pop_from_queue(self):
-        self.lock.acquire()
-        try:
-            if(len(self.queue) > 0):
-                return self.queue.pop(0)
-            else:
-                return ""
-        finally:
-            self.lock.release()
-        
 
 class VisitedPages():
     def __init__(self):
@@ -146,11 +124,11 @@ def search(goal_page, visited, queue, parent, path_lock):
     goal_node = goal_page.title
 
     while not STOP_THREADS:
-        current_node = queue.pop_from_queue()
-
-        if(len(current_node) <= 0):
-            time.sleep(0.1)
+        if(queue.empty()):
+            time.sleep(1)
             continue
+        else:
+            current_node = queue.get()
 
         if current_node == goal_node:
             path_found = True
@@ -165,7 +143,7 @@ def search(goal_page, visited, queue, parent, path_lock):
         
         for link in links:
             if visited.notVisited(link):
-                queue.add_to_queue(link)
+                queue.put(link)
                 parent.add_parent(current_node, link) 
                 if(link == goal_node):
                     path_found = True
@@ -223,11 +201,11 @@ def main():
     
     print("\nSearching...\n")
     visited = VisitedPages()
-    queue = PageQueue()
+    queue = Queue()
     parent = Parent()
     path_lock = threading.Lock()
 
-    queue.add_to_queue(start_page.title)
+    queue.put(start_page.title)
     visited.add_to_visited(start_page.title)
     parent.add_parent(None, start_page.title)
 
