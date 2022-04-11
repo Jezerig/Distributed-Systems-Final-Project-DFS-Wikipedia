@@ -16,7 +16,7 @@
 import threading
 import time
 import wikipedia
-from queue import Queue
+from queue import Queue # has locking built in
 
 THREAD_COUNT = 10
 STOP_THREADS = False # global variable to tell the threads to stop: https://www.geeksforgeeks.org/python-different-ways-to-kill-a-thread/
@@ -151,7 +151,6 @@ def search(goal_page, visited, queue, parent, path_lock):
         
         if(path_found):
             break
-        
         if(STOP_THREADS):
             break
 
