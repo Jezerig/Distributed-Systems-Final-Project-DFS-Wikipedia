@@ -43,15 +43,6 @@ class PageQueue():
         finally:
             self.lock.release()
         
-    # def not_empty(self):
-    #     self.lock.acquire()
-    #     try:
-    #         if (len(self.queue) > 0):
-    #             return True
-    #         else:
-    #             return False
-    #     finally:
-    #         self.lock.release()
 
 class VisitedPages():
     def __init__(self):
@@ -76,6 +67,7 @@ class VisitedPages():
         finally:
             self.lock.release()
 
+
 class Parent():
     def __init__(self):
         self.lock = threading.Lock()
@@ -91,18 +83,6 @@ class Parent():
     def get_parent(self, page):
         return self.parent[page]
 
-# class Path():
-#     def __init__(self):
-#         self.lock = threading.Lock()
-#         self.path = []
-
-#     def add_to_path(self, page):
-#         self.lock.acquire()
-#         try:
-#             self.path.append(page)
-#         finally:
-#             self.lock.release()
-
 
 def search_page_name(page_type): # selecting the search term
     while(True):
@@ -112,6 +92,7 @@ def search_page_name(page_type): # selecting the search term
         else:
             print(f"Please write the name of the {page_type} page.")
     return page_name
+
 
 def page_select(page_type): # selecting the spesific page from the list of search results
     while(True):
@@ -140,12 +121,12 @@ def page_select(page_type): # selecting the spesific page from the list of searc
         else:
             print(f"\nThe selection has to be a number between 1 and {len(pages)}.")
             continue
+
     while(True):
         try:
             return_page = wikipedia.page(selected_page, auto_suggest=False)
             print(f"\nSuccess. {page_type} page set as '{return_page.title}'.")
             return return_page
-
         except(wikipedia.PageError):
             print(f"Error with the page '{selected_page}'. Exiting...")
             exit(-1)
@@ -159,33 +140,39 @@ def page_select(page_type): # selecting the spesific page from the list of searc
             exit(-1)
             
 
-
 def search(goal_page, visited, queue, parent, path_lock):
     global STOP_THREADS
     path_found = False
     goal_node = goal_page.title
+
     while not STOP_THREADS:
         current_node = queue.pop_from_queue()
+
         if(len(current_node) <= 0):
             time.sleep(0.1)
             continue
+
         if current_node == goal_node:
             path_found = True
             break
+
         # start_time = time.time()
         try:
             links = wikipedia.page(current_node, auto_suggest=False).links
         except(wikipedia.PageError, wikipedia.DisambiguationError):
             continue
         # print(f"'{current_node}' Wikipedia API response time: {round((time.time() - start_time), 3)} seconds ({threading.current_thread().name}).")
+        
         for link in links:
             if visited.notVisited(link):
                 queue.add_to_queue(link)
                 parent.add_parent(current_node, link) 
                 if(link == goal_node):
                     path_found = True
+        
         if(path_found):
             break
+        
         if(STOP_THREADS):
             break
 
@@ -202,19 +189,24 @@ def search(goal_page, visited, queue, parent, path_lock):
 
 def shortest_path(goal_node, parent):
     global EXIT_FLAG
+
     path = []
     path.append(goal_node)
     previous_node = goal_node
+
     while(parent.get_parent(previous_node) is not None):
         path.append(parent.get_parent(previous_node))
         previous_node = parent.get_parent(previous_node)
+
     path.reverse()
     print(f"The shortest path with the length of {len(path) - 1} is: ")
+
     for node in path:
         if(node != path[-1]):
             print(f"{node} -> ", end="")
         else:
             print(node)
+
     EXIT_FLAG = True
 
 
@@ -229,6 +221,7 @@ def main():
         print("The Start page and the Goal page are the same. Path length 0.")
         return 0
     
+    print("\nSearching...\n")
     visited = VisitedPages()
     queue = PageQueue()
     parent = Parent()
@@ -251,17 +244,18 @@ def main():
             print("Fatal Error with threads")
             exit(-1)
 
-    while not EXIT_FLAG:
+    while(True):
         try:
-            time.sleep(0.1)           
+            time.sleep(0.1)
+            if(EXIT_FLAG):
+                print(f"\nSearch time: {round((time.time() - start_time), 3)} seconds")
+                break
         except KeyboardInterrupt:
             print("KeyboardInterrupt")
             exit(-1)
-
-    print(f"Execution time: {round((time.time() - start_time), 3)} seconds.")
     return 0
 
 if __name__ == '__main__':
-    main()
+    exit(main())
 
 # EOF
