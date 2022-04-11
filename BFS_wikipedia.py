@@ -6,7 +6,6 @@
 # https://wikipedia.readthedocs.io/en/latest/quickstart.html
 # https://github.com/goldsmith/Wikipedia/issues/176
 # https://stackabuse.com/graphs-in-python-breadth-first-search-bfs-algorithm/
-# https://stackoverflow.com/questions/44219288/should-i-bother-locking-the-queue-when-i-put-to-or-get-from-it
 # https://www.geeksforgeeks.org/breadth-first-search-or-bfs-for-a-graph/
 # https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution
 # http://pymotw.com/2/threading/
@@ -19,10 +18,10 @@ import wikipedia
 from queue import Queue
 
 THREAD_COUNT = 10
-STOP_THREADS = False
-EXIT_FLAG = False
+STOP_THREADS = False # global variable to tell the threads to stop: https://www.geeksforgeeks.org/python-different-ways-to-kill-a-thread/
+EXIT_FLAG = False # global variable to tell the main function to exit
 
-class VisitedPages():
+class VisitedPages():   # list for already visited pages
     def __init__(self):
         self.lock = threading.Lock()
         self.visited = []
@@ -46,7 +45,7 @@ class VisitedPages():
             self.lock.release()
 
 
-class Parent():
+class Parent(): # dictionary for parent-child relationship of nodes
     def __init__(self):
         self.lock = threading.Lock()
         self.parent = dict()
@@ -88,7 +87,7 @@ def page_select(page_type): # selecting the spesific page from the list of searc
         print(f"{i}. {page}")
         i+=1
 
-    while(True):
+    while(True): # selection from the list of pages
         selection = input("\nSelection: ")
         if(not(selection.isdigit())):
             print(f"\nThe selection has to be a number between 1 and {len(pages)}.")
@@ -100,7 +99,7 @@ def page_select(page_type): # selecting the spesific page from the list of searc
             print(f"\nThe selection has to be a number between 1 and {len(pages)}.")
             continue
 
-    while(True):
+    while(True): # if the selected page provides an error then the user can type the name of the page freely
         try:
             return_page = wikipedia.page(selected_page, auto_suggest=False)
             print(f"\nSuccess. {page_type} page set as '{return_page.title}'.")
@@ -108,7 +107,7 @@ def page_select(page_type): # selecting the spesific page from the list of searc
         except(wikipedia.PageError):
             print(f"Error with the page '{selected_page}'. Exiting...")
             exit(-1)
-        except wikipedia.DisambiguationError as e:
+        except wikipedia.DisambiguationError as e: # prints a list of pages due to 'DisambiguationError'
             print(f"\nThe page '{selected_page}' created a Disambiguation Error due to it not being a spesific page.\nTry with one of the pages listed below.\n")
             print(e)
             selected_page = input(f"\n{page_type} page name: ")
@@ -116,15 +115,16 @@ def page_select(page_type): # selecting the spesific page from the list of searc
         except wikipedia.WikipediaException:
             print("Error with the Wikipedia API. Exiting...")
             exit(-1)
-            
 
-def search(goal_page, visited, queue, parent, path_lock):
+# BFS search function with help from: https://stackabuse.com/graphs-in-python-breadth-first-search-bfs-algorithm/
+# https://www.geeksforgeeks.org/breadth-first-search-or-bfs-for-a-graph/
+def search(goal_page, visited, queue, parent, path_lock): 
     global STOP_THREADS
     path_found = False
     goal_node = goal_page.title
 
-    while not STOP_THREADS:
-        if(queue.empty()):
+    while not STOP_THREADS: # loops until one of the threads sets the STOP_STHREADS variable as True
+        if(queue.empty()): # Checks if new pages have been added to the queue. Used at the beginning when the first page and it's links have been read
             time.sleep(1)
             continue
         else:
@@ -135,13 +135,13 @@ def search(goal_page, visited, queue, parent, path_lock):
             break
 
         # start_time = time.time()
-        try:
+        try: # Links within a page; skips pages that cause the errors below
             links = wikipedia.page(current_node, auto_suggest=False).links
         except(wikipedia.PageError, wikipedia.DisambiguationError):
             continue
         # print(f"'{current_node}' Wikipedia API response time: {round((time.time() - start_time), 3)} seconds ({threading.current_thread().name}).")
         
-        for link in links:
+        for link in links: # searched through the links of the page
             if visited.notVisited(link):
                 queue.put(link)
                 parent.add_parent(current_node, link) 
@@ -157,7 +157,7 @@ def search(goal_page, visited, queue, parent, path_lock):
     if path_found:
         path_lock.acquire()
         try:
-            if(STOP_THREADS):
+            if(STOP_THREADS): # used to stop two threads from printing a path; first one to acquire lock executes the printing
                 return
             STOP_THREADS = True
             shortest_path(goal_node, parent)
@@ -165,7 +165,7 @@ def search(goal_page, visited, queue, parent, path_lock):
             path_lock.release()
         
 
-def shortest_path(goal_node, parent):
+def shortest_path(goal_node, parent): # form the path and prints it
     global EXIT_FLAG
 
     path = []
@@ -185,7 +185,7 @@ def shortest_path(goal_node, parent):
         else:
             print(node)
 
-    EXIT_FLAG = True
+    EXIT_FLAG = True # tells the main function to exit
 
 
 def main():
@@ -209,10 +209,10 @@ def main():
     visited.add_to_visited(start_page.title)
     parent.add_parent(None, start_page.title)
 
-    start_time = time.time()
+    start_time = time.time() # timer for search time
 
     threads_list = []
-    for i in range(THREAD_COUNT):
+    for i in range(THREAD_COUNT): # creating threads with help from: http://pymotw.com/2/threading/
         try:
             thread = threading.Thread(target=search, args=(goal_page, visited, queue, parent, path_lock), name=f"Thread-{i}")
             thread.daemon = True
@@ -222,13 +222,13 @@ def main():
             print("Fatal Error with threads")
             exit(-1)
 
-    while(True):
+    while(True): # loops until one of threads has printed the path
         try:
             time.sleep(0.1)
             if(EXIT_FLAG):
                 print(f"\nSearch time: {round((time.time() - start_time), 3)} seconds")
                 break
-        except KeyboardInterrupt:
+        except KeyboardInterrupt: # makes it possible to use KeyboardInterrupt while searching: https://stackoverflow.com/questions/11436502/closing-all-threads-with-a-keyboard-interrupt
             print("KeyboardInterrupt")
             exit(-1)
     return 0
