@@ -11,6 +11,7 @@
 # http://pymotw.com/2/threading/
 # https://www.geeksforgeeks.org/python-different-ways-to-kill-a-thread/
 # https://stackoverflow.com/questions/11436502/closing-all-threads-with-a-keyboard-interrupt
+# https://www.bogotobogo.com/python/Multithread/python_multithreading_Synchronization_Lock_Objects_Acquire_Release.php
 
 import threading
 import time
@@ -21,7 +22,7 @@ THREAD_COUNT = 10
 STOP_THREADS = False # global variable to tell the threads to stop: https://www.geeksforgeeks.org/python-different-ways-to-kill-a-thread/
 EXIT_FLAG = False # global variable to tell the main function to exit
 
-class VisitedPages():   # list for already visited pages
+class VisitedPages():   # list for already visited pages with locking: https://www.bogotobogo.com/python/Multithread/python_multithreading_Synchronization_Lock_Objects_Acquire_Release.php
     def __init__(self):
         self.lock = threading.Lock()
         self.visited = []
